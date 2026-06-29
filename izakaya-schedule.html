@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>작살 Staff</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07111f;--card:#0d1d30;--card2:#0a1726;--border:#1a3050;
+  --text:#e8eef6;--muted:#4a6a8a;--accent:#5b9cf6;--accent2:#3a7fd4;
+  --orange:#f47c3c;--orange2:#d96a2a;--radius:14px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;min-height:100vh;max-width:480px;margin:0 auto;padding-bottom:40px}
+
+/* ── HEADER ── */
+.header{padding:20px 20px 10px;display:flex;align-items:flex-start;justify-content:space-between}
+.header-eyebrow{font-size:12px;color:var(--accent);font-weight:600;margin-bottom:4px}
+.header-title{font-size:26px;font-weight:800;color:var(--text)}
+.seg-wrap{display:flex;background:#0d1d30;border-radius:20px;padding:3px;gap:2px;margin-top:4px}
+.seg-btn{padding:5px 14px;border-radius:16px;font-size:13px;font-weight:600;border:none;background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .15s}
+.seg-btn.on{background:#152a42;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+
+/* ── SUMMARY CARD ── */
+.summary-card{margin:8px 16px 12px;border-radius:var(--radius);background:linear-gradient(135deg,#0d2040,#0a1726);border:1px solid #1e3a5a;padding:22px;color:#fff}
+.summary-name{font-size:13px;color:rgba(255,255,255,.35);margin-bottom:2px}
+.summary-hours{font-size:44px;font-weight:800;line-height:1;margin-bottom:6px;display:flex;align-items:baseline;gap:6px}
+.summary-hours em{font-size:20px;font-weight:400;font-style:normal;color:rgba(255,255,255,.35)}
+.summary-pay{font-size:14px;color:rgba(255,255,255,.35)}
+.summary-pay b{color:var(--accent)}
+
+/* Boss summary card */
+.boss-summary{margin:8px 16px 12px;border-radius:var(--radius);background:linear-gradient(135deg,#0d2040,#0a1726);border:1px solid #1e3a5a;padding:22px;color:#fff}
+.bs-label{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:8px}
+.bs-amount{font-size:44px;font-weight:800;line-height:1;margin-bottom:10px}
+.bs-meta{font-size:13px;color:rgba(255,255,255,.4);display:flex;gap:8px;align-items:center}
+.bs-dot{color:rgba(255,255,255,.2)}
+
+/* ── SECTION ── */
+.section{background:var(--card);border-radius:var(--radius);margin:0 16px 12px;padding:20px;border:1px solid var(--border)}
+.sec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.section-title{font-size:16px;font-weight:700;color:var(--text)}
+.sec-refresh{font-size:13px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
+.sec-refresh:hover{color:var(--accent)}
+
+/* ── FIELD ── */
+.field-label{font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.field-box{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);width:100%;font-family:inherit;outline:none;transition:border-color .2s}
+.field-box:focus{border-color:var(--accent)}
+.field-box::placeholder{color:#2a4a6a}
+.field-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+.field-hours{font-size:20px;font-weight:800;color:var(--accent);white-space:nowrap;padding-bottom:13px}
+.field-hours small{font-size:13px;font-weight:400;color:var(--muted)}
+select.field-box{appearance:none;-webkit-appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234a6a8a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+select.field-box option{background:#0d1d30;color:var(--text)}
+textarea.field-box{resize:vertical;min-height:80px}
+.mb12{margin-bottom:12px}
+
+/* ── SEND BTN ── */
+.send-btn{width:100%;padding:16px;font-size:16px;font-weight:700;background:var(--accent);color:#fff;border:none;border-radius:12px;cursor:pointer;font-family:inherit;transition:background .2s;margin-top:4px}
+.send-btn:hover{background:var(--accent2)}
+.send-btn:disabled{background:#1a3050;color:#3a5a7a;cursor:not-allowed}
+
+/* ── RECORDS (staff) ── */
+.record-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.record-count{background:var(--bg);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;color:var(--muted);border:1px solid var(--border)}
+.record-empty{text-align:center;padding:20px;color:var(--muted);font-size:14px;line-height:1.8}
+.record-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.record-item:last-child{border-bottom:none}
+.record-date{font-size:13px;color:var(--muted)}
+.record-time{font-size:14px;font-weight:600;color:var(--text)}
+.record-h{font-size:14px;font-weight:700;color:var(--accent)}
+
+/* ── PAYROLL ROWS ── */
+.pay-empty{text-align:center;padding:16px;color:var(--muted);font-size:14px;line-height:1.8}
+.pay-note{font-size:11px;color:var(--muted);line-height:1.7;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.pay-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.pay-item:last-of-type{border-bottom:none}
+.pay-name{font-size:14px;font-weight:700;color:var(--text)}
+.pay-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.pay-amount{text-align:right}
+.pay-won{font-size:14px;font-weight:700;color:var(--accent)}
+.pay-h{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* ── STAFF MANAGEMENT ── */
+.staff-add-row{display:flex;gap:8px;margin-bottom:14px}
+.staff-add-input{flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none}
+.staff-add-input:focus{border-color:var(--accent)}
+.staff-add-input::placeholder{color:#2a4a6a}
+.add-btn{padding:11px 18px;background:var(--orange);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.add-btn:hover{background:var(--orange2)}
+.staff-badge{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;color:var(--muted)}
+.staff-list{display:flex;flex-direction:column;gap:0}
+.staff-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}
+.staff-row:last-child{border-bottom:none}
+.staff-nm{font-size:14px;font-weight:600;color:var(--text)}
+.staff-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:0 4px;line-height:1}
+.staff-del:hover{color:#f07070}
+.staff-empty{font-size:13px;color:var(--muted);padding:10px 0}
+
+/* ── SETTINGS BTN ── */
+.settings-btn{width:calc(100% - 32px);margin:0 16px 12px;padding:16px;background:none;border:1.5px dashed var(--border);border-radius:var(--radius);color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+.settings-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── MSG ── */
+.msg{text-align:center;padding:12px;border-radius:10px;font-size:14px;margin-top:10px;display:none}
+.msg.ok{background:#0a2a18;color:#4ae08a;border:1px solid #1a5a38}
+.msg.err{background:#2a0a0a;color:#f07070;border:1px solid #5a1a1a}
+
+/* ── MODALS ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;z-index:100}
+.overlay.hidden{display:none}
+.modal{background:#0d1d30;border-radius:20px 20px 0 0;padding:28px 24px 36px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;border-top:1px solid var(--border)}
+.modal-handle{width:36px;height:4px;background:#1a3050;border-radius:2px;margin:0 auto 20px}
+.modal h2{font-size:18px;font-weight:700;margin-bottom:6px;color:var(--text)}
+.modal p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px}
+.modal-field{margin-bottom:14px}
+.modal-field label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px;font-weight:500}
+.modal-field input{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;padding:11px 13px;outline:none;font-family:inherit}
+.modal-field input:focus{border-color:var(--accent)}
+.modal-btns{display:flex;gap:10px;margin-top:20px}
+.btn-primary{flex:1;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-secondary{padding:14px 20px;background:none;color:var(--muted);border:1.5px solid var(--border);border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit}
+.err-text{font-size:12px;color:#f07070;margin-top:6px;display:none}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="header">
+  <div>
+    <div class="header-eyebrow" id="eyebrow">작살 Staff</div>
+    <div class="header-title" id="mainTitle">작살 Staff</div>
+  </div>
+  <div class="seg-wrap">
+    <button class="seg-btn on" id="btnStaff" onclick="goStaff()">Staff</button>
+    <button class="seg-btn" id="btnOwner" onclick="goOwner()">Boss</button>
+  </div>
+</div>
+
+<!-- ════ STAFF VIEW ════ -->
+<div id="staffView">
+
+  <div class="section" style="margin-bottom:12px">
+    <div class="field-label">이름</div>
+    <select class="field-box" id="staffName" onchange="updateSummary();loadMyRecords()">
+      <option value="">이름 선택</option>
+    </select>
+  </div>
+
+  <div class="summary-card">
+    <div class="summary-name" id="summaryName">· 다음 주</div>
+    <div class="summary-hours"><span id="totalHours">0</span><em>시간</em></div>
+    <div class="summary-pay">예상 급여 <b id="totalPay">₩0</b></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title" style="margin-bottom:16px">근무 입력</div>
+
+    <div class="mb12">
+      <div class="field-label">날짜</div>
+      <select class="field-box" id="dateSelect" onchange="updateHours()">
+        <option value="">날짜 선택</option>
+      </select>
+    </div>
+
+    <div class="field-row mb12">
+      <div>
+        <div class="field-label">출근</div>
+        <select class="field-box" id="startTime" onchange="updateHours()">
+          <option value="17:00">17:00</option>
+          <option value="18:00">18:00</option>
+          <option value="19:00">19:00</option>
+          <option value="20:00">20:00</option>
+          <option value="21:00">21:00</option>
+        </select>
+      </div>
+      <div>
+        <div class="field-label">퇴근</div>
+        <select class="field-box" id="endTime" onchange="updateHours()">
+          <option value="22:00">22:00</option>
+          <option value="23:00">23:00</option>
+          <option value="00:00">00:00</option>
+          <option value="01:00">01:00</option>
+          <option value="02:00">02:00</option>
+          <option value="03:00" selected>03:00</option>
+          <option value="04:00">04:00</option>
+          <option value="05:00">05:00</option>
+        </select>
+      </div>
+      <div class="field-hours"><span id="shiftHours">0</span><small> 시간</small></div>
+    </div>
+
+    <div class="mb12">
+      <div class="field-label">메모 (선택)</div>
+      <textarea class="field-box" id="staffMemo" placeholder="예: 마감 정리 포함"></textarea>
+    </div>
+
+    <button class="send-btn" id="submitBtn" onclick="submitSchedule()">Boss에게 전송</button>
+    <div class="msg" id="formMsg"></div>
+  </div>
+
+  <div class="section">
+    <div class="record-header">
+      <div class="section-title">이번 주 기록</div>
+      <div class="record-count" id="recordCount">0</div>
+    </div>
+    <div id="recordList"><div class="record-empty">아직 기록이 없어요</div></div>
+  </div>
+
+</div><!-- /staffView -->
+
+<!-- ════ BOSS VIEW ════ -->
+<div id="ownerView" style="display:none">
+
+  <!-- 예상 인건비 카드 -->
+  <div class="boss-summary">
+    <div class="bs-label" id="bsWeekLabel">이번 주 예상 인건비</div>
+    <div class="bs-amount" id="bsAmount">₩0</div>
+    <div class="bs-meta">
+      <span><span id="bsTotalH">0</span>시간</span>
+      <span class="bs-dot">•</span>
+      <span>Staff <span id="bsStaffCount">0</span>명</span>
+      <span class="bs-dot">•</span>
+      <span>주휴수당 포함</span>
+    </div>
+  </div>
+
+  <!-- 이번 주 정산 -->
+  <div class="section">
+    <div class="sec-head">
+      <div class="section-title">이번 주 정산</div>
+      <button class="sec-refresh" onclick="loadBossDash()">새로고침</button>
+    </div>
+    <div id="payrollList"><div class="pay-empty">아직 전송된 근무가 없어요.<br>Staff가 입력하면 여기에 모입니다.</div></div>
+    <div class="pay-note">주휴수당은 주 15시간 이상·소정근로일 개근이 전제이며, 세금·4대 보험은 빠진 추정치예요.</div>
+  </div>
+
+  <!-- 알바생 관리 -->
+  <div class="section">
+    <div class="sec-head">
+      <div class="section-title">Staff 관리</div>
+      <span class="staff-badge" id="staffBadge">0</span>
+    </div>
+    <div class="staff-add-row">
+      <input type="text" class="staff-add-input" id="newStaffName" placeholder="이름 입력" onkeydown="if(event.key==='Enter')addStaff()">
+      <button class="add-btn" onclick="addStaff()">추가</button>
+    </div>
+    <div class="staff-list" id="staffList"><div class="staff-empty">등록된 Staff가 없어요</div></div>
+  </div>
+
+  <!-- 설정 버튼 -->
+  <button class="settings-btn" onclick="openSetup()">시급 · 비밀번호 설정</button>
+
+</div><!-- /ownerView -->
+
+<!-- ════ MODALS ════ -->
+
+<!-- 비밀번호 -->
+<div class="overlay hidden" id="pwModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>🔒 Boss 전용</h2>
+    <p>비밀번호를 입력하세요</p>
+    <div class="modal-field">
+      <input type="password" id="pwInput" placeholder="비밀번호" onkeydown="if(event.key==='Enter')checkPw()">
+    </div>
+    <div class="err-text" id="pwErr">비밀번호가 틀렸습니다</div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal('pwModal');goStaff()">취소</button>
+      <button class="btn-primary" onclick="checkPw()">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 설정 -->
+<div class="overlay" id="setupModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>⚙️ 설정</h2>
+    <p>시급 및 비밀번호 설정</p>
+    <div class="modal-field"><label>가게 이름</label>
+      <input type="text" id="cfgShop" placeholder="작살 이자카야">
+    </div>
+    <div class="modal-field"><label>시급 (원)</label>
+      <input type="text" id="cfgWage" placeholder="예: 10030">
+    </div>
+    <div class="modal-field"><label>Boss 비밀번호</label>
+      <input type="password" id="cfgPw" placeholder="기본값: 0000">
+    </div>
+    <div class="err-text" id="setupErr">URL과 키를 모두 입력해주세요</div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal('setupModal')">닫기</button>
+      <button class="btn-primary" onclick="saveSetup()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAY_NAMES = ['일','월','화','수','목','금','토'];
+const SB_URL = 'https://brhcnejnqflfcpgetukb.supabase.co';
+const SB_KEY = 'sb_publishable_hoWEngA_eXKK-5k2XySXTw_cshw4chQ';
+let cfg = JSON.parse(localStorage.getItem('timetable_cfg') || '{}');
+let staffRoster = JSON.parse(localStorage.getItem('timetable_staff') || '[]');
+let sb = null;
+let ownerUnlocked = false;
+let ownerWeekOffset = 0;
+
+// ── INIT ──────────────────────────────────────────
+window.onload = () => {
+  cfg.url = SB_URL;
+  cfg.key = SB_KEY;
+  applyConfig();
+  closeModal('setupModal');
+  initSb();
+  buildDateOptions();
+  loadStaffRoster();
+  loadMyRecords();
+};
+
+function applyConfig() {
+  const name = cfg.shop || '작살 Staff';
+  document.getElementById('eyebrow').textContent = name;
+  document.getElementById('mainTitle').textContent = name;
+}
+
+function initSb() { sb = supabase.createClient(cfg.url, cfg.key); }
+
+// ── SETUP ─────────────────────────────────────────
+function saveSetup() {
+  cfg = {
+    url: SB_URL,
+    key: SB_KEY,
+    shop: document.getElementById('cfgShop').value.trim() || '작살 Staff',
+    wage: parseInt(document.getElementById('cfgWage').value) || 0,
+    pw: document.getElementById('cfgPw').value.trim() || '0000',
+  };
+  localStorage.setItem('timetable_cfg', JSON.stringify(cfg));
+  applyConfig();
+  closeModal('setupModal');
+  initSb();
+  buildDateOptions();
+}
+
+function openSetup() {
+  if (cfg.url) document.getElementById('cfgUrl').value = cfg.url;
+  if (cfg.key) document.getElementById('cfgKey').value = cfg.key;
+  if (cfg.shop) document.getElementById('cfgShop').value = cfg.shop;
+  if (cfg.wage) document.getElementById('cfgWage').value = cfg.wage;
+  if (cfg.pw) document.getElementById('cfgPw').value = cfg.pw;
+  document.getElementById('setupErr').style.display = 'none';
+  document.getElementById('setupModal').classList.remove('hidden');
+}
+
+// ── UTILS ─────────────────────────────────────────
+function getMon(offset=0) {
+  const now = new Date();
+  const d = new Date(now);
+  d.setDate(now.getDate() - ((now.getDay()+6)%7) + offset*7);
+  d.setHours(0,0,0,0);
+  return d;
+}
+function getWeekKey(offset=0) {
+  const d = getMon(offset);
+  const jan1 = new Date(d.getFullYear(),0,1);
+  const wn = Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+  return `${d.getFullYear()}-W${String(wn).padStart(2,'0')}`;
+}
+function weekRange(offset=0) {
+  const mon = getMon(offset); const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+  return `${mon.getMonth()+1}/${mon.getDate()} - ${sun.getMonth()+1}/${sun.getDate()}`;
+}
+function calcH(s,e) {
+  let [sh]= s.split(':').map(Number); let [eh]= e.split(':').map(Number);
+  if(eh<=sh) eh+=24; return eh-sh;
+}
+function toDS(d){return d.toISOString().split('T')[0];}
+
+// ── STAFF VIEW ────────────────────────────────────
+function buildDateOptions() {
+  const sel = document.getElementById('dateSelect');
+  sel.innerHTML = '<option value="">날짜 선택</option>';
+  const mon = getMon(1);
+  for(let i=0;i<7;i++){
+    const d=new Date(mon); d.setDate(mon.getDate()+i);
+    const ds=toDS(d), dow=d.getDay();
+    sel.innerHTML+=`<option value="${ds}">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[dow]})</option>`;
+  }
+  document.getElementById('summaryName').textContent=`다음 주 · ${weekRange(1)}`;
+  updateHours();
+}
+
+function updateHours() {
+  const h = calcH(document.getElementById('startTime').value, document.getElementById('endTime').value);
+  document.getElementById('shiftHours').textContent = h;
+}
+
+function updateSummary() {
+  const name = document.getElementById('staffName').value;
+  document.getElementById('summaryName').textContent = (name||'—') + ' · 다음 주 ' + weekRange(1);
+}
+
+async function loadMyRecords() {
+  if(!sb) return;
+  const name = document.getElementById('staffName').value.trim();
+  if(!name){renderRecords([]);return;}
+  const {data} = await sb.from('submissions').select('*').eq('staff_name',name).eq('week_key',getWeekKey(1)).order('date');
+  renderRecords(data||[]);
+}
+
+function renderRecords(list) {
+  const el=document.getElementById('recordList');
+  document.getElementById('recordCount').textContent=list.length;
+  let totalH=0;
+  if(!list.length){el.innerHTML='<div class="record-empty">아직 기록이 없어요</div>';}
+  else{
+    el.innerHTML=list.map(r=>{
+      const h=calcH(r.start_time||'17:00',r.end_time||'03:00'); totalH+=h;
+      const d=new Date(r.date+'T00:00:00');
+      return `<div class="record-item">
+        <div><div class="record-date">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})</div>
+        <div class="record-time">${r.start_time} ~ ${r.end_time}</div></div>
+        <div class="record-h">${h}h</div></div>`;
+    }).join('');
+  }
+  document.getElementById('totalHours').textContent=totalH;
+  document.getElementById('totalPay').textContent=cfg.wage?'₩'+(totalH*cfg.wage).toLocaleString():'₩0';
+}
+
+async function submitSchedule() {
+  const name=document.getElementById('staffName').value.trim();
+  const date=document.getElementById('dateSelect').value;
+  const start=document.getElementById('startTime').value;
+  const end=document.getElementById('endTime').value;
+  const memo=document.getElementById('staffMemo').value.trim();
+  if(!name){showMsg('err','이름을 입력해주세요');return;}
+  if(!date){showMsg('err','날짜를 선택해주세요');return;}
+  if(!sb){showMsg('err','Supabase 설정이 필요합니다');return;}
+  const btn=document.getElementById('submitBtn');
+  btn.disabled=true; btn.textContent='전송 중...';
+  const wk=getWeekKey(1);
+  await sb.from('submissions').delete().eq('staff_name',name).eq('date',date).eq('week_key',wk);
+  const {error}=await sb.from('submissions').insert({
+    staff_name:name,week_key:wk,date,start_time:start,end_time:end,
+    available:true,can_extend:false,extend_hours:0,early_leave_time:null,memo:memo||null
+  });
+  btn.disabled=false; btn.textContent='Boss에게 전송';
+  if(error){showMsg('err','전송 실패: '+error.message);return;}
+  showMsg('ok','✅ 전송 완료!');
+  document.getElementById('staffMemo').value='';
+  document.getElementById('dateSelect').value='';
+  loadMyRecords();
+}
+
+function showMsg(type,text) {
+  const m=document.getElementById('formMsg');
+  m.className='msg '+type; m.textContent=text; m.style.display='block';
+  setTimeout(()=>{m.style.display='none';},3500);
+}
+
+// ── BOSS VIEW ─────────────────────────────────────
+async function loadBossDash() {
+  if(!sb) return;
+  const wk = getWeekKey(ownerWeekOffset);
+  document.getElementById('bsWeekLabel').textContent =
+    (ownerWeekOffset===0?'이번 주':'다음 주') + ' 예상 인건비 · ' + weekRange(ownerWeekOffset);
+
+  const {data:subs,error} = await sb.from('submissions').select('*').eq('week_key',wk).order('date');
+  if(error||!subs?.length){
+    document.getElementById('bsAmount').textContent='₩0';
+    document.getElementById('bsTotalH').textContent='0';
+    document.getElementById('bsStaffCount').textContent='0';
+    document.getElementById('payrollList').innerHTML=
+      '<div class="pay-empty">아직 전송된 근무가 없어요.<br>Staff가 입력하면 여기에 모입니다.</div>';
+    return;
+  }
+
+  // aggregate by staff
+  const byName={};
+  subs.forEach(s=>{
+    if(!byName[s.staff_name]) byName[s.staff_name]={h:0};
+    byName[s.staff_name].h += calcH(s.start_time||'17:00', s.end_time||'03:00');
+  });
+
+  const wage = cfg.wage||0;
+  let totalH=0, totalPay=0;
+  const names = Object.keys(byName);
+  names.forEach(n=>{ totalH+=byName[n].h; totalPay+=byName[n].h*wage; });
+
+  document.getElementById('bsAmount').textContent = wage?'₩'+totalPay.toLocaleString():'₩—';
+  document.getElementById('bsTotalH').textContent = totalH;
+  document.getElementById('bsStaffCount').textContent = names.length;
+
+  document.getElementById('payrollList').innerHTML = names.map(n=>{
+    const h=byName[n].h;
+    const pay=wage?'₩'+(h*wage).toLocaleString():'₩—';
+    return `<div class="pay-item">
+      <div><div class="pay-name">${n}</div><div class="pay-sub">${h}시간</div></div>
+      <div class="pay-amount"><div class="pay-won">${pay}</div><div class="pay-h">${h}h × ${wage?'₩'+wage.toLocaleString():'미설정'}</div></div>
+    </div>`;
+  }).join('');
+}
+
+// ── STAFF ROSTER (Supabase) ───────────────────────
+async function loadStaffRoster() {
+  if(!sb) return;
+  const {data} = await sb.from('staff_roster').select('*').order('created_at');
+  staffRoster = (data||[]).map(r=>r.name);
+  renderStaffList();
+  renderStaffSelect();
+}
+
+function renderStaffSelect() {
+  const sel = document.getElementById('staffName');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">이름 선택</option>';
+  staffRoster.forEach(n => {
+    sel.innerHTML += `<option value="${n}" ${n===cur?'selected':''}>${n}</option>`;
+  });
+}
+
+function renderStaffList() {
+  const el=document.getElementById('staffList');
+  document.getElementById('staffBadge').textContent=staffRoster.length;
+  if(!staffRoster.length){el.innerHTML='<div class="staff-empty">등록된 Staff가 없어요</div>';return;}
+  el.innerHTML=staffRoster.map((n,i)=>`
+    <div class="staff-row">
+      <span class="staff-nm">${n}</span>
+      <button class="staff-del" onclick="removeStaff(${i})">×</button>
+    </div>`).join('');
+}
+
+async function addStaff() {
+  const input=document.getElementById('newStaffName');
+  const name=input.value.trim();
+  if(!name||staffRoster.includes(name)) return;
+  await sb.from('staff_roster').insert({name});
+  input.value='';
+  loadStaffRoster();
+}
+
+async function removeStaff(i) {
+  const name = staffRoster[i];
+  await sb.from('staff_roster').delete().eq('name', name);
+  loadStaffRoster();
+}
+
+// ── NAV ───────────────────────────────────────────
+function goOwner() {
+  if(ownerUnlocked){showOwner();return;}
+  document.getElementById('pwInput').value='';
+  document.getElementById('pwErr').style.display='none';
+  document.getElementById('pwModal').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('pwInput').focus(),200);
+}
+
+function checkPw() {
+  if(document.getElementById('pwInput').value===(cfg.pw||'0000')){
+    ownerUnlocked=true; closeModal('pwModal'); showOwner();
+  } else {
+    document.getElementById('pwErr').style.display='block';
+    document.getElementById('pwInput').value='';
+  }
+}
+
+function goStaff() {
+  ownerUnlocked=false;
+  document.getElementById('staffView').style.display='';
+  document.getElementById('ownerView').style.display='none';
+  document.getElementById('btnStaff').classList.add('on');
+  document.getElementById('btnOwner').classList.remove('on');
+  document.getElementById('eyebrow').textContent=cfg.shop||'작살 Staff';
+}
+
+function showOwner() {
+  document.getElementById('staffView').style.display='none';
+  document.getElementById('ownerView').style.display='';
+  document.getElementById('btnStaff').classList.remove('on');
+  document.getElementById('btnOwner').classList.add('on');
+  document.getElementById('eyebrow').textContent='Boss Dashboard';
+  loadStaffRoster();
+  loadBossDash();
+}
+
+function closeModal(id){document.getElementById(id).classList.add('hidden');}
+</script>
+</body>
+</html>
