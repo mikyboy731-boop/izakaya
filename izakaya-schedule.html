@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>작살 Staff</title>
+<!-- PWA -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#07111f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="작살">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<!-- OG / 카톡 썸네일 -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="작살 Staff">
+<meta property="og:description" content="작살 이자카야 Staff 스케줄러">
+<meta property="og:image" content="https://mikyboy731-boop.github.io/izakaya/og-image.png">
+<meta property="og:url" content="https://mikyboy731-boop.github.io/izakaya/izakaya-schedule.html">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -453,8 +467,7 @@ async function loadMyRecords() {
   if(!sb) return;
   const name = document.getElementById('staffName').value.trim();
   if(!name){renderRecords([]);return;}
-  const {first} = monthRange(0);   // 이번달 1일
-  const {last}  = monthRange(1);   // 다음달 말일
+  const {first, last} = monthRange(0);  // 이번달 1일 ~ 말일만
   const {data} = await sb.from('submissions').select('*')
     .eq('staff_name', name)
     .gte('date', first)
