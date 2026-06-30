@@ -210,7 +210,11 @@ textarea.field-box{resize:vertical;min-height:80px}
 
   <!-- 예상 인건비 카드 -->
   <div class="boss-summary">
-    <div class="bs-label" id="bsWeekLabel">이번 달 예상 인건비</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <button onclick="changeMonth(-1)" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:20px;cursor:pointer;padding:0 4px;line-height:1">‹</button>
+      <div class="bs-label" id="bsWeekLabel" style="margin-bottom:0">이번 달 예상 인건비</div>
+      <button onclick="changeMonth(1)" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:20px;cursor:pointer;padding:0 4px;line-height:1">›</button>
+    </div>
     <div class="bs-amount" id="bsAmount">₩0</div>
     <div style="font-size:13px;color:#4ae08a;margin-bottom:8px">실수령 합계 <span id="bsAmountNet">₩0</span></div>
     <div class="bs-meta">
@@ -695,6 +699,11 @@ function showOwner() {
   document.getElementById('btnStaff').classList.remove('on');
   document.getElementById('btnOwner').classList.add('on');
   loadStaffRoster();
+  loadBossDash();
+}
+
+function changeMonth(dir) {
+  ownerMonthOffset += dir;
   loadBossDash();
 }
 
