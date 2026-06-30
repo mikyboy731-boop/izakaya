@@ -226,7 +226,10 @@ textarea.field-box{resize:vertical;min-height:80px}
   <div class="section">
     <div class="sec-head">
       <div class="section-title">이번 달 정산</div>
-      <button class="sec-refresh" onclick="loadBossDash()">새로고침</button>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="sec-refresh" onclick="loadBossDash()">새로고침</button>
+        <button class="sec-refresh" style="color:#f07070" onclick="openResetConfirm()">초기화</button>
+      </div>
     </div>
     <div id="payrollList"><div class="pay-empty">아직 전송된 근무가 없어요.<br>Staff가 입력하면 여기에 모입니다.</div></div>
     <div class="pay-note">주휴수당은 주 15시간 이상·소정근로일 개근이 전제이며, 세금·4대 보험은 빠진 추정치예요.</div>
@@ -251,6 +254,19 @@ textarea.field-box{resize:vertical;min-height:80px}
 </div><!-- /ownerView -->
 
 <!-- ════ MODALS ════ -->
+
+<!-- 초기화 확인 -->
+<div class="overlay hidden" id="resetModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>⚠️ 이번 달 초기화</h2>
+    <p id="resetModalDesc">이번 달 전체 근무 기록을 삭제합니다.<br>삭제 후 복구가 불가능합니다. 계속할까요?</p>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal('resetModal')">취소</button>
+      <button class="btn-primary" style="background:#c0392b" onclick="resetMonth()">삭제</button>
+    </div>
+  </div>
+</div>
 
 <!-- 비밀번호 -->
 <div class="overlay hidden" id="pwModal">
@@ -669,6 +685,24 @@ function showOwner() {
   document.getElementById('btnStaff').classList.remove('on');
   document.getElementById('btnOwner').classList.add('on');
   loadStaffRoster();
+  loadBossDash();
+}
+
+function openResetConfirm() {
+  document.getElementById('resetModalDesc').innerHTML =
+    `<b>${monthLabel(ownerMonthOffset)}</b> 전체 근무 기록을 삭제합니다.<br>삭제 후 복구가 불가능합니다. 계속할까요?`;
+  document.getElementById('resetModal').classList.remove('hidden');
+}
+
+async function resetMonth() {
+  if(!sb) return;
+  const wk = getMonthKey(ownerMonthOffset);
+  const btn = document.querySelector('#resetModal .btn-primary');
+  btn.disabled = true; btn.textContent = '삭제 중...';
+  const {error} = await sb.from('submissions').delete().eq('week_key', wk);
+  btn.disabled = false; btn.textContent = '삭제';
+  closeModal('resetModal');
+  if(error){ alert('삭제 실패: ' + error.message); return; }
   loadBossDash();
 }
 
