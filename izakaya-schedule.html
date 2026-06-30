@@ -266,7 +266,7 @@ textarea.field-box{resize:vertical;min-height:80px}
 </div>
 
 <!-- 설정 -->
-<div class="overlay" id="setupModal">
+<div class="overlay hidden" id="setupModal">
   <div class="modal">
     <div class="modal-handle"></div>
     <h2>⚙️ 설정</h2>
@@ -303,7 +303,6 @@ window.onload = () => {
   cfg.url = SB_URL;
   cfg.key = SB_KEY;
   applyConfig();
-  closeModal('setupModal');
   initSb();
   buildDateOptions();
   loadStaffRoster();
