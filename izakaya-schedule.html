@@ -312,7 +312,6 @@ window.onload = () => {
 
 function applyConfig() {
   const name = cfg.shop || '작살 Staff';
-  document.getElementById('eyebrow').textContent = name;
   document.getElementById('mainTitle').textContent = name;
 }
 
@@ -624,7 +623,6 @@ function goStaff() {
   document.getElementById('ownerView').style.display='none';
   document.getElementById('btnStaff').classList.add('on');
   document.getElementById('btnOwner').classList.remove('on');
-  document.getElementById('eyebrow').textContent=cfg.shop||'작살 Staff';
   loadStaffRoster();
 }
 
@@ -633,7 +631,6 @@ function showOwner() {
   document.getElementById('ownerView').style.display='';
   document.getElementById('btnStaff').classList.remove('on');
   document.getElementById('btnOwner').classList.add('on');
-  document.getElementById('eyebrow').textContent='Boss Dashboard';
   loadStaffRoster();
   loadBossDash();
 }
