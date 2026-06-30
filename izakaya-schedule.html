@@ -342,7 +342,7 @@ window.onload = async () => {
   cfg.url = SB_URL;
   cfg.key = SB_KEY;
   initSb();
-  if(!cfg.wage) await loadCfgFromCloud(); // 시급 없으면 클라우드에서 가져오기
+  await loadCfgFromCloud(); // 항상 클라우드에서 최신 시급 가져오기
   applyConfig();
   buildDateOptions();
   loadStaffRoster();
@@ -621,6 +621,7 @@ async function loadCfgFromCloud() {
       if(stored.shop) cfg.shop = stored.shop;
       localStorage.setItem('timetable_cfg', JSON.stringify(cfg));
       applyConfig();
+      loadMyRecords(); // 시급 로드 후 급여 재계산
     } catch(e) {}
   }
 }
