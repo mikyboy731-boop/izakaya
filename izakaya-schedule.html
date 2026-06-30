@@ -467,7 +467,8 @@ async function loadMyRecords() {
   if(!sb) return;
   const name = document.getElementById('staffName').value.trim();
   if(!name){renderRecords([]);return;}
-  const {first, last} = monthRange(0);  // 이번달 1일 ~ 말일만
+  const {first} = monthRange(0);   // 이번달 1일
+  const {last}  = monthRange(1);   // 다음달 말일 (리스트엔 전부 표시)
   const {data} = await sb.from('submissions').select('*')
     .eq('staff_name', name)
     .gte('date', first)
@@ -479,11 +480,13 @@ async function loadMyRecords() {
 function renderRecords(list) {
   const el=document.getElementById('recordList');
   document.getElementById('recordCount').textContent=list.length;
-  let totalH=0;
+  const {first:mFirst, last:mLast} = monthRange(0); // 이번달 범위
+  let totalH=0; // 이번달 합계만
   if(!list.length){el.innerHTML='<div class="record-empty">아직 기록이 없어요</div>';}
   else{
     el.innerHTML=list.map(r=>{
-      const h=calcH(r.start_time||'17:00',r.end_time||'03:00'); totalH+=h;
+      const h=calcH(r.start_time||'17:00',r.end_time||'03:00');
+      if(r.date >= mFirst && r.date <= mLast) totalH+=h; // 이번달만 합산
       const d=new Date(r.date+'T00:00:00');
       return `<div class="record-item">
         <div><div class="record-date">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})</div>
