@@ -480,13 +480,12 @@ async function loadMyRecords() {
 function renderRecords(list) {
   const el=document.getElementById('recordList');
   document.getElementById('recordCount').textContent=list.length;
-  const {first:mFirst, last:mLast} = monthRange(0); // 이번달 범위
-  let totalH=0; // 이번달 합계만
+  let totalH=0;
   if(!list.length){el.innerHTML='<div class="record-empty">아직 기록이 없어요</div>';}
   else{
     el.innerHTML=list.map(r=>{
       const h=calcH(r.start_time||'17:00',r.end_time||'03:00');
-      if(r.date >= mFirst && r.date <= mLast) totalH+=h; // 이번달만 합산
+      totalH+=h;
       const d=new Date(r.date+'T00:00:00');
       return `<div class="record-item">
         <div><div class="record-date">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})</div>
