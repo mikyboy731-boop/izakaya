@@ -15,9 +15,10 @@
 body{background:var(--bg);color:var(--text);font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;min-height:100vh;max-width:480px;margin:0 auto;padding-bottom:40px}
 
 /* ── HEADER ── */
-.header{padding:10px 20px 10px;display:flex;align-items:center;justify-content:space-between;position:relative}
+.header{padding:14px 16px 10px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
 .header-eyebrow{display:none}
-.header-title{font-size:32px;font-weight:900;color:#c8d8f0;position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;letter-spacing:-0.5px}
+.header-title{font-size:30px;font-weight:900;color:#c8d8f0;white-space:nowrap;letter-spacing:-0.5px;text-align:center}
+.header-right{display:flex;justify-content:flex-end}
 .seg-wrap{display:flex;background:#0d1d30;border-radius:20px;padding:3px;gap:2px;margin-top:4px}
 .seg-btn{padding:5px 14px;border-radius:16px;font-size:13px;font-weight:600;border:none;background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .15s}
 .seg-btn.on{background:#152a42;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.3)}
@@ -131,13 +132,13 @@ textarea.field-box{resize:vertical;min-height:80px}
 
 <!-- ── HEADER ── -->
 <div class="header">
-  <div>
-    <div class="header-eyebrow" id="eyebrow">작살 Staff</div>
-    <div class="header-title" id="mainTitle">작살 Staff</div>
-  </div>
-  <div class="seg-wrap">
-    <button class="seg-btn on" id="btnStaff" onclick="goStaff()">Staff</button>
-    <button class="seg-btn" id="btnOwner" onclick="goOwner()">Boss</button>
+  <div></div>
+  <div class="header-title" id="mainTitle">작살 Staff</div>
+  <div class="header-right">
+    <div class="seg-wrap">
+      <button class="seg-btn on" id="btnStaff" onclick="goStaff()">Staff</button>
+      <button class="seg-btn" id="btnOwner" onclick="goOwner()">Boss</button>
+    </div>
   </div>
 </div>
 
@@ -154,7 +155,8 @@ textarea.field-box{resize:vertical;min-height:80px}
   <div class="summary-card">
     <div class="summary-name" id="summaryName">· 다음 주</div>
     <div class="summary-hours"><span id="totalHours">0</span><em>시간</em></div>
-    <div class="summary-pay">예상 급여 <b id="totalPay">₩0</b></div>
+    <div class="summary-pay">세전 <b id="totalPay">₩0</b></div>
+    <div class="summary-pay" style="margin-top:4px">세후 (3.3% 공제) <b id="totalPayNet" style="color:#4ae08a">₩0</b></div>
   </div>
 
   <div class="section">
@@ -462,7 +464,10 @@ function renderRecords(list) {
     }).join('');
   }
   document.getElementById('totalHours').textContent=totalH;
-  document.getElementById('totalPay').textContent=cfg.wage?'₩'+(totalH*cfg.wage).toLocaleString():'₩0';
+  const gross = cfg.wage ? totalH*cfg.wage : 0;
+  const net = Math.round(gross * 0.967);
+  document.getElementById('totalPay').textContent=cfg.wage?'₩'+gross.toLocaleString():'₩0';
+  document.getElementById('totalPayNet').textContent=cfg.wage?'₩'+net.toLocaleString():'₩0';
 }
 
 async function submitSchedule() {
@@ -525,16 +530,24 @@ async function loadBossDash() {
   const names = Object.keys(byName);
   names.forEach(n=>{ totalH+=byName[n].h; totalPay+=byName[n].h*wage; });
 
+  const totalNet = Math.round(totalPay * 0.967);
   document.getElementById('bsAmount').textContent = wage?'₩'+totalPay.toLocaleString():'₩—';
   document.getElementById('bsTotalH').textContent = totalH;
   document.getElementById('bsStaffCount').textContent = names.length;
 
   document.getElementById('payrollList').innerHTML = names.map(n=>{
     const h=byName[n].h;
-    const pay=wage?'₩'+(h*wage).toLocaleString():'₩—';
+    const gross=h*wage;
+    const net=Math.round(gross*0.967);
+    const payGross=wage?'₩'+gross.toLocaleString():'₩—';
+    const payNet=wage?'₩'+net.toLocaleString():'₩—';
     return `<div class="pay-item">
       <div><div class="pay-name">${n}</div><div class="pay-sub">${h}시간</div></div>
-      <div class="pay-amount"><div class="pay-won">${pay}</div><div class="pay-h">${h}h × ${wage?'₩'+wage.toLocaleString():'미설정'}</div></div>
+      <div class="pay-amount">
+        <div class="pay-won">${payGross}</div>
+        <div class="pay-h" style="color:#4ae08a">실수령 ${payNet}</div>
+        <div class="pay-h">${h}h × ${wage?'₩'+wage.toLocaleString():'미설정'}</div>
+      </div>
     </div>`;
   }).join('');
 }
