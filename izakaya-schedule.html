@@ -324,11 +324,12 @@ let ownerMonthOffset = 0;
 let lockedName = localStorage.getItem('my_staff_name') || null;
 
 // ── INIT ──────────────────────────────────────────
-window.onload = () => {
+window.onload = async () => {
   cfg.url = SB_URL;
   cfg.key = SB_KEY;
-  applyConfig();
   initSb();
+  if(!cfg.wage) await loadCfgFromCloud(); // 시급 없으면 클라우드에서 가져오기
+  applyConfig();
   buildDateOptions();
   loadStaffRoster();
   loadMyRecords();
@@ -355,6 +356,7 @@ function saveSetup() {
   closeModal('setupModal');
   initSb();
   buildDateOptions();
+  saveCfgToCloud();
 }
 
 function openSetup() {
@@ -451,7 +453,8 @@ async function loadMyRecords() {
   if(!sb) return;
   const name = document.getElementById('staffName').value.trim();
   if(!name){renderRecords([]);return;}
-  const {first, last} = monthRange(0);
+  const {first} = monthRange(0);   // 이번달 1일
+  const {last}  = monthRange(1);   // 다음달 말일
   const {data} = await sb.from('submissions').select('*')
     .eq('staff_name', name)
     .gte('date', first)
@@ -582,11 +585,37 @@ async function loadBossDash() {
   }).join('');
 }
 
+// ── CONFIG CLOUD SYNC ─────────────────────────────
+const CFG_KEY = '__APP_CFG__';
+
+async function saveCfgToCloud() {
+  if(!sb) return;
+  const val = CFG_KEY + JSON.stringify({wage:cfg.wage, pw:cfg.pw, shop:cfg.shop});
+  await sb.from('staff_roster').delete().like('name', CFG_KEY + '%');
+  await sb.from('staff_roster').insert({name: val});
+}
+
+async function loadCfgFromCloud() {
+  if(!sb) return;
+  const {data} = await sb.from('staff_roster').select('*').like('name', CFG_KEY + '%');
+  if(data && data.length > 0) {
+    try {
+      const stored = JSON.parse(data[0].name.slice(CFG_KEY.length));
+      if(stored.wage) cfg.wage = stored.wage;
+      if(stored.pw)   cfg.pw   = stored.pw;
+      if(stored.shop) cfg.shop = stored.shop;
+      localStorage.setItem('timetable_cfg', JSON.stringify(cfg));
+      applyConfig();
+    } catch(e) {}
+  }
+}
+
 // ── STAFF ROSTER (Supabase) ───────────────────────
 async function loadStaffRoster() {
   if(!sb) return;
   const {data} = await sb.from('staff_roster').select('*').order('created_at');
-  staffRoster = (data||[]).map(r=>r.name);
+  // 설정값(__APP_CFG__) 제외하고 실제 이름만 추출
+  staffRoster = (data||[]).filter(r=>!r.name.startsWith(CFG_KEY)).map(r=>r.name);
   renderStaffList();
   renderStaffSelect();
 }
