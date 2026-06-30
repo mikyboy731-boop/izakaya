@@ -153,7 +153,7 @@ textarea.field-box{resize:vertical;min-height:80px}
   </div>
 
   <div class="summary-card">
-    <div class="summary-name" id="summaryName">· 다음 주</div>
+    <div class="summary-name" id="summaryName">이름을 선택하세요</div>
     <div class="summary-hours"><span id="totalHours">0</span><em>시간</em></div>
     <div class="summary-pay">세전 <b id="totalPay">₩0</b></div>
     <div class="summary-pay" style="margin-top:4px">세후 (3.3% 공제) <b id="totalPayNet" style="color:#4ae08a">₩0</b></div>
@@ -194,7 +194,7 @@ textarea.field-box{resize:vertical;min-height:80px}
 
   <div class="section">
     <div class="record-header">
-      <div class="section-title">이번 주 기록</div>
+      <div class="section-title">이번 달 기록</div>
       <div class="record-count" id="recordCount">0</div>
     </div>
     <div id="recordList"><div class="record-empty">아직 기록이 없어요</div></div>
@@ -209,12 +209,13 @@ textarea.field-box{resize:vertical;min-height:80px}
   <div class="boss-summary">
     <div class="bs-label" id="bsWeekLabel">이번 달 예상 인건비</div>
     <div class="bs-amount" id="bsAmount">₩0</div>
+    <div style="font-size:13px;color:#4ae08a;margin-bottom:8px">실수령 합계 <span id="bsAmountNet">₩0</span></div>
     <div class="bs-meta">
       <span><span id="bsTotalH">0</span>시간</span>
       <span class="bs-dot">•</span>
       <span>Staff <span id="bsStaffCount">0</span>명</span>
       <span class="bs-dot">•</span>
-      <span>월 합산</span>
+      <span>3.3% 공제</span>
     </div>
   </div>
 
@@ -357,23 +358,7 @@ function dateToMonthKey(ds) {
   return ds.slice(0,7);
 }
 
-function getMon(offset=0) {
-  const now = new Date();
-  const d = new Date(now);
-  d.setDate(now.getDate() - ((now.getDay()+6)%7) + offset*7);
-  d.setHours(0,0,0,0);
-  return d;
-}
-function getWeekKey(offset=0) {
-  const d = getMon(offset);
-  const jan1 = new Date(d.getFullYear(),0,1);
-  const wn = Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
-  return `${d.getFullYear()}-W${String(wn).padStart(2,'0')}`;
-}
-function weekRange(offset=0) {
-  const mon = getMon(offset); const sun = new Date(mon); sun.setDate(mon.getDate()+6);
-  return `${mon.getMonth()+1}/${mon.getDate()} - ${sun.getMonth()+1}/${sun.getDate()}`;
-}
+
 function calcH(s,e) {
   const [sh,sm]= s.split(':').map(Number); const [eh,em]= e.split(':').map(Number);
   let start=sh*60+(sm||0), end=eh*60+(em||0);
@@ -424,7 +409,7 @@ function buildDateOptions() {
 
 function updateHours() {
   const h = calcH(document.getElementById('startTime').value, document.getElementById('endTime').value);
-  document.getElementById('shiftHours').textContent = h;
+  document.getElementById('shiftHours').textContent = Number.isInteger(h) ? h : h.toFixed(1);
 }
 
 function updateSummary() {
@@ -461,7 +446,7 @@ function renderRecords(list) {
         <div class="record-h">${h}h</div></div>`;
     }).join('');
   }
-  document.getElementById('totalHours').textContent=totalH;
+  document.getElementById('totalHours').textContent=Number.isInteger(totalH)?totalH:totalH.toFixed(1);
   const gross = cfg.wage ? totalH*cfg.wage : 0;
   const net = Math.round(gross * 0.967);
   document.getElementById('totalPay').textContent=cfg.wage?'₩'+gross.toLocaleString():'₩0';
@@ -509,6 +494,7 @@ async function loadBossDash() {
   const {data:subs,error} = await sb.from('submissions').select('*').eq('week_key',wk).order('date');
   if(error||!subs?.length){
     document.getElementById('bsAmount').textContent='₩0';
+    document.getElementById('bsAmountNet').textContent='₩0';
     document.getElementById('bsTotalH').textContent='0';
     document.getElementById('bsStaffCount').textContent='0';
     document.getElementById('payrollList').innerHTML=
@@ -530,6 +516,7 @@ async function loadBossDash() {
 
   const totalNet = Math.round(totalPay * 0.967);
   document.getElementById('bsAmount').textContent = wage?'₩'+totalPay.toLocaleString():'₩—';
+  document.getElementById('bsAmountNet').textContent = wage?'₩'+totalNet.toLocaleString():'₩—';
   document.getElementById('bsTotalH').textContent = totalH;
   document.getElementById('bsStaffCount').textContent = names.length;
 
