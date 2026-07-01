@@ -38,6 +38,24 @@ body{background:var(--bg);color:var(--text);font-family:'Apple SD Gothic Neo','N
 .seg-btn.on{background:#152a42;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.3)}
 #btnStaff.on{background:#c0392b;color:#fff}
 #btnOwner.on{background:#152a42;color:#c8d8f0}
+#btnView.on{background:#152a42;color:#c8d8f0}
+
+/* ── VIEW TAB ── */
+.view-staff-block{padding:12px 0;border-bottom:1px solid var(--border)}
+.view-staff-block:last-child{border-bottom:none;padding-bottom:0}
+.view-staff-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+.view-staff-name{font-size:14px;font-weight:700;color:var(--text)}
+.view-staff-summary{font-size:12px;color:#7fb8a0;font-weight:600}
+.view-toggle-btn{color:var(--muted);font-size:13px;min-width:14px;text-align:right}
+.view-records{display:none;margin-top:8px}
+.view-records.open{display:block}
+.view-rec{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid rgba(26,48,80,.5)}
+.view-rec:last-of-type{border-bottom:none}
+.view-rec-date{font-size:11px;color:var(--muted);margin-bottom:1px}
+.view-rec-time{font-size:13px;font-weight:600;color:var(--text)}
+.view-rec-h{font-size:13px;font-weight:700;color:#5b9cf6;white-space:nowrap}
+.view-total-row{display:flex;justify-content:space-between;padding-top:7px;margin-top:4px;border-top:1px solid var(--border)}
+.view-total-val{font-size:12px;font-weight:800;color:#7fb8a0}
 
 /* ── SUMMARY CARD ── */
 .summary-card{margin:8px 16px 12px;border-radius:var(--radius);background:linear-gradient(135deg,#0d2040,#0a1726);border:1px solid #1e3a5a;padding:22px;color:#fff}
@@ -153,6 +171,7 @@ textarea.field-box{resize:vertical;min-height:80px}
     <div class="seg-wrap">
       <button class="seg-btn on" id="btnStaff" onclick="goStaff()">Staff</button>
       <button class="seg-btn" id="btnOwner" onclick="goOwner()">Boss</button>
+      <button class="seg-btn" id="btnView" onclick="goView()">View</button>
     </div>
   </div>
 </div>
@@ -272,6 +291,33 @@ textarea.field-box{resize:vertical;min-height:80px}
 
 </div><!-- /ownerView -->
 
+<!-- ════ VIEW TAB ════ -->
+<div id="viewView" style="display:none">
+
+  <!-- 월 헤더 -->
+  <div class="boss-summary">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <button onclick="changeViewMonth(-1)" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:20px;cursor:pointer;padding:0 4px;line-height:1">‹</button>
+      <div class="bs-label" id="viewMonthLabel" style="margin-bottom:0">이번 달 근무 기록</div>
+      <button onclick="changeViewMonth(1)" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:20px;cursor:pointer;padding:0 4px;line-height:1">›</button>
+    </div>
+    <div class="bs-amount" id="viewTotalH">0<span style="font-size:20px;font-weight:400;color:rgba(255,255,255,.35)">시간</span></div>
+    <div class="bs-meta">
+      <span>Staff <span id="viewStaffCount">0</span>명</span>
+    </div>
+  </div>
+
+  <!-- 아코디언 직원 목록 -->
+  <div class="section">
+    <div class="sec-head">
+      <div class="section-title">월별 히스토리</div>
+      <button class="sec-refresh" onclick="loadViewDash()">새로고침</button>
+    </div>
+    <div id="viewStaffList"><div class="pay-empty">이 달 기록이 없어요</div></div>
+  </div>
+
+</div><!-- /viewView -->
+
 <!-- ════ MODALS ════ -->
 
 <!-- Staff 삭제 비밀번호 확인 -->
@@ -320,7 +366,7 @@ textarea.field-box{resize:vertical;min-height:80px}
     </div>
     <div class="err-text" id="pwErr">비밀번호가 틀렸습니다</div>
     <div class="modal-btns">
-      <button class="btn-secondary" onclick="closeModal('pwModal');goStaff()">취소</button>
+      <button class="btn-secondary" onclick="pendingGoView=false;closeModal('pwModal');goStaff()">취소</button>
       <button class="btn-primary" onclick="checkPw()">확인</button>
     </div>
   </div>
@@ -358,6 +404,9 @@ let staffRoster = JSON.parse(localStorage.getItem('timetable_staff') || '[]');
 let sb = null;
 let ownerUnlocked = false;
 let ownerMonthOffset = 0;
+let viewMonthOffset = 0;
+let viewOpenStates = {};
+let pendingGoView = false;
 let lockedName = localStorage.getItem('my_staff_name') || null;
 
 // ── INIT ──────────────────────────────────────────
@@ -515,7 +564,7 @@ function renderRecords(list) {
       return `<div class="record-item">
         <div><div class="record-date">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})</div>
         <div class="record-time">${r.start_time} ~ ${r.end_time}</div></div>
-        <div class="record-h">${h}h</div></div>`;
+        <div class="record-h">${Number.isInteger(h)?h:h.toFixed(1)}시간</div></div>`;
     }).join('');
   }
   document.getElementById('totalHours').textContent=Number.isInteger(totalH)?totalH:totalH.toFixed(1);
@@ -756,9 +805,21 @@ async function confirmStaffDel() {
 
 // ── NAV ───────────────────────────────────────────
 function goOwner() {
+  pendingGoView=false;
   if(ownerUnlocked){showOwner();return;}
   const exp = parseInt(localStorage.getItem('boss_session')||'0');
   if(exp && Date.now() < exp){ownerUnlocked=true;showOwner();return;}
+  document.getElementById('pwInput').value='';
+  document.getElementById('pwErr').style.display='none';
+  document.getElementById('pwModal').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('pwInput').focus(),200);
+}
+
+function goView() {
+  pendingGoView=true;
+  if(ownerUnlocked){showView();return;}
+  const exp = parseInt(localStorage.getItem('boss_session')||'0');
+  if(exp && Date.now() < exp){ownerUnlocked=true;showView();return;}
   document.getElementById('pwInput').value='';
   document.getElementById('pwErr').style.display='none';
   document.getElementById('pwModal').classList.remove('hidden');
@@ -769,7 +830,9 @@ function checkPw() {
   if(document.getElementById('pwInput').value===(cfg.pw||'0000')){
     ownerUnlocked=true;
     localStorage.setItem('boss_session', Date.now() + 30*24*60*60*1000);
-    closeModal('pwModal'); showOwner();
+    closeModal('pwModal');
+    if(pendingGoView){pendingGoView=false;showView();}
+    else{showOwner();}
   } else {
     document.getElementById('pwErr').style.display='block';
     document.getElementById('pwInput').value='';
@@ -780,18 +843,117 @@ function goStaff() {
   ownerUnlocked=false;
   document.getElementById('staffView').style.display='';
   document.getElementById('ownerView').style.display='none';
+  document.getElementById('viewView').style.display='none';
   document.getElementById('btnStaff').classList.add('on');
   document.getElementById('btnOwner').classList.remove('on');
+  document.getElementById('btnView').classList.remove('on');
   loadStaffRoster();
 }
 
 function showOwner() {
   document.getElementById('staffView').style.display='none';
   document.getElementById('ownerView').style.display='';
+  document.getElementById('viewView').style.display='none';
   document.getElementById('btnStaff').classList.remove('on');
   document.getElementById('btnOwner').classList.add('on');
+  document.getElementById('btnView').classList.remove('on');
   loadStaffRoster();
   loadBossDash();
+}
+
+function showView() {
+  document.getElementById('staffView').style.display='none';
+  document.getElementById('ownerView').style.display='none';
+  document.getElementById('viewView').style.display='';
+  document.getElementById('btnStaff').classList.remove('on');
+  document.getElementById('btnOwner').classList.remove('on');
+  document.getElementById('btnView').classList.add('on');
+  loadViewDash();
+}
+
+async function loadViewDash() {
+  if(!sb) return;
+  const {first, last} = monthRange(viewMonthOffset);
+  document.getElementById('viewMonthLabel').textContent = monthLabel(viewMonthOffset) + ' 근무 기록';
+
+  const {data:subs} = await sb.from('submissions').select('*')
+    .gte('date', first).lte('date', last).order('date');
+
+  if(!subs?.length) {
+    document.getElementById('viewTotalH').innerHTML = '0<span style="font-size:20px;font-weight:400;color:rgba(255,255,255,.35)">시간</span>';
+    document.getElementById('viewStaffCount').textContent = '0';
+    document.getElementById('viewStaffList').innerHTML = '<div class="pay-empty">이 달 기록이 없어요</div>';
+    return;
+  }
+
+  const byName = {};
+  subs.forEach(s => {
+    if(!byName[s.staff_name]) byName[s.staff_name] = {h:0, entries:[]};
+    const h = calcH(s.start_time||'17:00', s.end_time||'03:00');
+    byName[s.staff_name].h += h;
+    byName[s.staff_name].entries.push({date:s.date, start:s.start_time, end:s.end_time, h, memo:s.memo});
+  });
+
+  const names = Object.keys(byName);
+  let totalH = 0;
+  names.forEach(n => totalH += byName[n].h);
+  const totalHVal = Number.isInteger(totalH) ? totalH : totalH.toFixed(1);
+  document.getElementById('viewTotalH').innerHTML = totalHVal + '<span style="font-size:20px;font-weight:400;color:rgba(255,255,255,.35)">시간</span>';
+  document.getElementById('viewStaffCount').textContent = names.length;
+
+  document.getElementById('viewStaffList').innerHTML = names.map(n => {
+    const h = byName[n].h;
+    const hVal = Number.isInteger(h) ? h : h.toFixed(1);
+    const gross = cfg.wage ? h * cfg.wage : 0;
+    const net = Math.round(gross * 0.967);
+    const isOpen = !!viewOpenStates[n];
+    const arrow = isOpen ? '▼' : '▶';
+
+    const entriesHtml = byName[n].entries.map(e => {
+      const d = new Date(e.date+'T00:00:00');
+      const eH = Number.isInteger(e.h) ? e.h : e.h.toFixed(1);
+      return `<div class="view-rec">
+        <div>
+          <div class="view-rec-date">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})</div>
+          <div class="view-rec-time">${e.start} ~ ${e.end}${e.memo?` · <span style="color:var(--muted);font-size:12px">${e.memo}</span>`:''}</div>
+        </div>
+        <div class="view-rec-h">${eH}시간</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="view-staff-block">
+      <div class="view-staff-header" onclick="toggleViewStaff('${n}')">
+        <div class="view-staff-name">${n}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="view-staff-summary">${hVal}시간${cfg.wage?' · ₩'+gross.toLocaleString():''}</div>
+          <div class="view-toggle-btn" id="vtb-${n}">${arrow}</div>
+        </div>
+      </div>
+      <div class="view-records${isOpen?' open':''}" id="vr-${n}">
+        ${entriesHtml}
+        <div class="view-total-row">
+          <span class="view-total-val">합계 ${hVal}시간</span>
+          ${cfg.wage?`<span class="view-total-val">세후 ₩${net.toLocaleString()}</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleViewStaff(name) {
+  const rec = document.getElementById('vr-'+name);
+  const btn = document.getElementById('vtb-'+name);
+  if(!rec) return;
+  const isOpen = rec.classList.contains('open');
+  rec.classList.toggle('open', !isOpen);
+  btn.textContent = isOpen ? '▶' : '▼';
+  viewOpenStates[name] = !isOpen;
+}
+
+function changeViewMonth(dir) {
+  viewMonthOffset += dir;
+  viewOpenStates = {};
+  loadViewDash();
 }
 
 function changeMonth(dir) {
