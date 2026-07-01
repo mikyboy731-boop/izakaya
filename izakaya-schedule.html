@@ -296,7 +296,11 @@ textarea.field-box{resize:vertical;min-height:80px}
   <div class="modal">
     <div class="modal-handle"></div>
     <h2>⚠️ 이번 달 초기화</h2>
-    <p id="resetModalDesc">이번 달 전체 근무 기록을 삭제합니다.<br>삭제 후 복구가 불가능합니다. 계속할까요?</p>
+    <p id="resetModalDesc">이번 달 전체 근무 기록을 삭제합니다.<br>삭제 후 복구가 불가능합니다.</p>
+    <div class="modal-field">
+      <input type="password" id="resetPwInput" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')resetMonth()">
+    </div>
+    <div class="err-text" id="resetPwErr">비밀번호가 틀렸습니다</div>
     <div class="modal-btns">
       <button class="btn-secondary" onclick="closeModal('resetModal')">취소</button>
       <button class="btn-primary" style="background:#c0392b" onclick="resetMonth()">삭제</button>
@@ -588,8 +592,10 @@ async function loadBossDash() {
   // aggregate by staff
   const byName={};
   subs.forEach(s=>{
-    if(!byName[s.staff_name]) byName[s.staff_name]={h:0};
-    byName[s.staff_name].h += calcH(s.start_time||'17:00', s.end_time||'03:00');
+    if(!byName[s.staff_name]) byName[s.staff_name]={h:0, entries:[]};
+    const h = calcH(s.start_time||'17:00', s.end_time||'03:00');
+    byName[s.staff_name].h += h;
+    byName[s.staff_name].entries.push({id:s.id, date:s.date, start:s.start_time, end:s.end_time, h});
   });
 
   const wage = cfg.wage||0;
@@ -609,12 +615,16 @@ async function loadBossDash() {
     const net=Math.round(gross*0.967);
     const payGross=wage?'₩'+gross.toLocaleString():'₩—';
     const payNet=wage?'₩'+net.toLocaleString():'₩—';
+    const entriesHtml = byName[n].entries.map(e=>{
+      const d=new Date(e.date+'T00:00:00');
+      const hVal=Number.isInteger(e.h)?e.h:e.h.toFixed(1);
+      return `<div class="pay-h">${d.getMonth()+1}/${d.getDate()} ${e.start}~${e.end} (${hVal}시간)</div>`;
+    }).join('');
     return `<div class="pay-item">
-      <div><div class="pay-name">${n}</div><div class="pay-sub">${h}시간</div></div>
+      <div><div class="pay-name">${n}</div>${entriesHtml}<div class="pay-sub" style="margin-top:4px">합계 ${Number.isInteger(h)?h:h.toFixed(1)}시간</div></div>
       <div class="pay-amount">
-        <div class="pay-won">${payGross}</div>
+        <div class="pay-won" style="color:#4ae08a">${payGross}</div>
         <div class="pay-h" style="color:#4ae08a">실수령 ${payNet}</div>
-        <div class="pay-h">${h}h × ${wage?'₩'+wage.toLocaleString():'미설정'}</div>
       </div>
     </div>`;
   }).join('');
@@ -790,12 +800,20 @@ function changeMonth(dir) {
 
 function openResetConfirm() {
   document.getElementById('resetModalDesc').innerHTML =
-    `<b>${monthLabel(ownerMonthOffset)}</b> 전체 근무 기록을 삭제합니다.<br>삭제 후 복구가 불가능합니다. 계속할까요?`;
+    `<b>${monthLabel(ownerMonthOffset)}</b> 전체 근무 기록을 삭제합니다.<br>삭제 후 복구가 불가능합니다.`;
+  document.getElementById('resetPwInput').value = '';
+  document.getElementById('resetPwErr').style.display = 'none';
   document.getElementById('resetModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('resetPwInput').focus(), 200);
 }
 
 async function resetMonth() {
   if(!sb) return;
+  if(document.getElementById('resetPwInput').value !== (cfg.pw || '0000')) {
+    document.getElementById('resetPwErr').style.display = 'block';
+    document.getElementById('resetPwInput').value = '';
+    return;
+  }
   const {first, last} = monthRange(ownerMonthOffset);
   const btn = document.querySelector('#resetModal .btn-primary');
   btn.disabled = true; btn.textContent = '삭제 중...';
