@@ -51,7 +51,7 @@ body{background:var(--bg);color:var(--text);font-family:'Apple SD Gothic Neo','N
 .view-records.open{display:block}
 .view-rec{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid rgba(26,48,80,.5)}
 .view-rec:last-of-type{border-bottom:none}
-.view-rec-date{font-size:11px;color:var(--muted);margin-bottom:1px}
+.view-rec-date{font-size:11px;color:#4ae08a;margin-bottom:2px;font-weight:600}
 .view-rec-time{font-size:13px;font-weight:600;color:var(--text)}
 .view-rec-h{font-size:13px;font-weight:700;color:#5b9cf6;white-space:nowrap}
 .view-total-row{display:flex;justify-content:space-between;padding-top:7px;margin-top:4px;border-top:1px solid var(--border)}
@@ -915,7 +915,7 @@ async function loadViewDash() {
       return `<div class="view-rec">
         <div>
           <div class="view-rec-date">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})</div>
-          <div class="view-rec-time">${e.start} ~ ${e.end}${e.memo?` · <span style="color:var(--muted);font-size:12px">${e.memo}</span>`:''}</div>
+          <div class="view-rec-time">${e.start} ~ ${e.end}</div>
         </div>
         <div class="view-rec-h">${eH}시간</div>
       </div>`;
