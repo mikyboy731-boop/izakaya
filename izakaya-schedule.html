@@ -184,7 +184,7 @@ textarea.field-box{resize:vertical;min-height:80px}
       <div class="field-label" style="margin-bottom:0">이름</div>
       <button id="nameChangeBtn" onclick="unlockName()" style="display:none;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;text-decoration:underline">이름 변경</button>
     </div>
-    <select class="field-box" id="staffName" onchange="updateSummary();loadMyRecords()">
+    <select class="field-box" id="staffName" onchange="onNameSelected(this.value)">
       <option value="">이름 선택</option>
     </select>
   </div>
@@ -320,6 +320,45 @@ textarea.field-box{resize:vertical;min-height:80px}
 
 <!-- ════ MODALS ════ -->
 
+<!-- 비밀번호 설정 (첫 접속) -->
+<div class="overlay hidden" id="setPwModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>🔑 비밀번호 설정</h2>
+    <p><b id="setPwNameLabel"></b> 님, 처음 접속이에요.<br>앞으로 사용할 비밀번호를 설정해주세요.</p>
+    <div class="modal-field">
+      <label>비밀번호</label>
+      <input type="password" id="setPwInput" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')document.getElementById('setPwInput2').focus()">
+    </div>
+    <div class="modal-field">
+      <label>비밀번호 확인</label>
+      <input type="password" id="setPwInput2" placeholder="비밀번호 재입력" onkeydown="if(event.key==='Enter')confirmSetPw()">
+    </div>
+    <div class="err-text" id="setPwErr">비밀번호가 일치하지 않습니다</div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="cancelPwModal()">취소</button>
+      <button class="btn-primary" onclick="confirmSetPw()">설정 완료</button>
+    </div>
+  </div>
+</div>
+
+<!-- 비밀번호 확인 (재접속) -->
+<div class="overlay hidden" id="verifyPwModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>🔒 본인 확인</h2>
+    <p><b id="verifyPwNameLabel"></b> 님의 비밀번호를 입력하세요</p>
+    <div class="modal-field">
+      <input type="password" id="verifyPwInput" placeholder="비밀번호" onkeydown="if(event.key==='Enter')confirmVerifyPw()">
+    </div>
+    <div class="err-text" id="verifyPwErr">비밀번호가 틀렸습니다</div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="cancelPwModal()">취소</button>
+      <button class="btn-primary" onclick="confirmVerifyPw()">확인</button>
+    </div>
+  </div>
+</div>
+
 <!-- Staff 삭제 비밀번호 확인 -->
 <div class="overlay hidden" id="staffDelModal">
   <div class="modal">
@@ -408,13 +447,25 @@ let viewMonthOffset = 0;
 let viewOpenStates = {};
 let pendingGoView = false;
 let lockedName = localStorage.getItem('my_staff_name') || null;
+const STAFF_PWS_KEY = '__STAFF_PWS__';
+let staffPws = {};
+let selectedNameForPw = null;
 
 // ── INIT ──────────────────────────────────────────
 window.onload = async () => {
   cfg.url = SB_URL;
   cfg.key = SB_KEY;
   initSb();
-  await loadCfgFromCloud(); // 항상 클라우드에서 최신 시급 가져오기
+  await loadCfgFromCloud();
+  await loadStaffPws();
+  // 세션 유효하면 lockedName 자동 복원
+  if(lockedName) {
+    const exp = parseInt(localStorage.getItem('staff_session_'+lockedName)||'0');
+    if(!exp || Date.now() >= exp) {
+      lockedName = null;
+      localStorage.removeItem('my_staff_name');
+    }
+  }
   applyConfig();
   buildDateOptions();
   loadStaffRoster();
@@ -680,6 +731,83 @@ async function loadBossDash() {
   }).join('');
 }
 
+// ── STAFF PASSWORD ────────────────────────────────
+async function loadStaffPws() {
+  if(!sb) return;
+  const {data} = await sb.from('staff_roster').select('*').like('name', STAFF_PWS_KEY + '%');
+  if(data && data.length > 0) {
+    try { staffPws = JSON.parse(data[0].name.slice(STAFF_PWS_KEY.length)); } catch(e) { staffPws = {}; }
+  }
+}
+
+async function saveStaffPws() {
+  if(!sb) return;
+  const val = STAFF_PWS_KEY + JSON.stringify(staffPws);
+  await sb.from('staff_roster').delete().like('name', STAFF_PWS_KEY + '%');
+  await sb.from('staff_roster').insert({name: val});
+}
+
+function onNameSelected(name) {
+  if(!name) return;
+  selectedNameForPw = name;
+  if(staffPws[name]) {
+    // 비밀번호 있음 → 확인
+    document.getElementById('verifyPwNameLabel').textContent = name;
+    document.getElementById('verifyPwInput').value = '';
+    document.getElementById('verifyPwErr').style.display = 'none';
+    document.getElementById('verifyPwModal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('verifyPwInput').focus(), 200);
+  } else {
+    // 첫 접속 → 설정
+    document.getElementById('setPwNameLabel').textContent = name;
+    document.getElementById('setPwInput').value = '';
+    document.getElementById('setPwInput2').value = '';
+    document.getElementById('setPwErr').style.display = 'none';
+    document.getElementById('setPwModal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('setPwInput').focus(), 200);
+  }
+}
+
+async function confirmSetPw() {
+  const pw1 = document.getElementById('setPwInput').value;
+  const pw2 = document.getElementById('setPwInput2').value;
+  const errEl = document.getElementById('setPwErr');
+  if(!pw1) { errEl.textContent='비밀번호를 입력해주세요'; errEl.style.display='block'; return; }
+  if(pw1 !== pw2) { errEl.textContent='비밀번호가 일치하지 않습니다'; errEl.style.display='block'; return; }
+  staffPws[selectedNameForPw] = pw1;
+  await saveStaffPws();
+  closeModal('setPwModal');
+  lockNameToDevice(selectedNameForPw);
+}
+
+function confirmVerifyPw() {
+  const pw = document.getElementById('verifyPwInput').value;
+  if(pw !== staffPws[selectedNameForPw]) {
+    document.getElementById('verifyPwErr').style.display = 'block';
+    document.getElementById('verifyPwInput').value = '';
+    return;
+  }
+  closeModal('verifyPwModal');
+  lockNameToDevice(selectedNameForPw);
+}
+
+function cancelPwModal() {
+  closeModal('setPwModal');
+  closeModal('verifyPwModal');
+  document.getElementById('staffName').value = '';
+  selectedNameForPw = null;
+}
+
+function lockNameToDevice(name) {
+  lockedName = name;
+  localStorage.setItem('my_staff_name', name);
+  // 90일 세션
+  localStorage.setItem('staff_session_'+name, Date.now() + 90*24*60*60*1000);
+  renderStaffSelect();
+  updateSummary();
+  loadMyRecords();
+}
+
 // ── CONFIG CLOUD SYNC ─────────────────────────────
 const CFG_KEY = '__APP_CFG__';
 
@@ -710,8 +838,8 @@ async function loadCfgFromCloud() {
 async function loadStaffRoster() {
   if(!sb) return;
   const {data} = await sb.from('staff_roster').select('*').order('created_at');
-  // 설정값(__APP_CFG__) 제외하고 실제 이름만 추출
-  staffRoster = (data||[]).filter(r=>!r.name.startsWith(CFG_KEY)).map(r=>r.name);
+  // 설정값(__APP_CFG__, __STAFF_PWS__) 제외하고 실제 이름만 추출
+  staffRoster = (data||[]).filter(r=>!r.name.startsWith(CFG_KEY)&&!r.name.startsWith(STAFF_PWS_KEY)).map(r=>r.name);
   renderStaffList();
   renderStaffSelect();
 }
@@ -732,33 +860,18 @@ async function renderStaffSelect() {
     return;
   }
 
-  // 이번 달 + 다음 달 제출한 이름 목록 조회 (다른 기기가 사용 중인 이름 표시용)
-  let claimedNames = [];
-  if (sb) {
-    const {first} = monthRange(0);  // 이번달 1일
-    const {last}  = monthRange(1);  // 다음달 말일
-    const {data} = await sb.from('submissions')
-      .select('staff_name')
-      .gte('date', first).lte('date', last);
-    if (data) claimedNames = [...new Set(data.map(r => r.staff_name))];
-  }
-
   sel.disabled = false;
   changeBtn.style.display = 'none';
-  const cur = sel.value;
   sel.innerHTML = '<option value="">이름 선택</option>';
   staffRoster.forEach(n => {
-    const isClaimed = claimedNames.includes(n);
-    sel.innerHTML += `<option value="${n}" ${n===cur?'selected':''} ${isClaimed?'disabled':''}>
-      ${n}${isClaimed?' (사용 중)':''}</option>`;
+    sel.innerHTML += `<option value="${n}">${n}</option>`;
   });
 }
 
 function unlockName() {
+  if(lockedName) localStorage.removeItem('staff_session_'+lockedName);
   lockedName = null;
   localStorage.removeItem('my_staff_name');
-  const sel = document.getElementById('staffName');
-  sel.disabled = false;
   renderStaffSelect();
 }
 
