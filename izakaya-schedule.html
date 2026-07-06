@@ -864,7 +864,8 @@ async function renderStaffSelect() {
   changeBtn.style.display = 'none';
   sel.innerHTML = '<option value="">이름 선택</option>';
   staffRoster.forEach(n => {
-    sel.innerHTML += `<option value="${n}">${n}</option>`;
+    const isRegistered = !!staffPws[n];
+    sel.innerHTML += `<option value="${n}">${n}${isRegistered?' (등록됨)':''}</option>`;
   });
 }
 
