@@ -166,6 +166,10 @@ textarea.field-box{resize:vertical;min-height:80px}
 .status-approved{background:#0a2a18;color:#4ae08a;border:1px solid #1a5a38}
 .status-rejected{background:#2a0a0a;color:#f07070;border:1px solid #5a1a1a}
 
+/* ── EDIT ENTRY BTN ── */
+.edit-entry-btn{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px 6px;border-radius:6px;flex-shrink:0;line-height:1}
+.edit-entry-btn:hover{background:#1a3050;color:var(--text)}
+
 /* ── PENDING ITEMS ── */
 .pending-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .pending-item:last-child{border-bottom:none}
@@ -282,6 +286,15 @@ textarea.field-box{resize:vertical;min-height:80px}
       <div class="section-title">⏳ 승인 대기 <span id="pendingBadge" style="background:#f5c842;color:#1a1000;font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:6px">0</span></div>
     </div>
     <div id="pendingList"></div>
+  </div>
+
+  <!-- 수정 확인 대기 -->
+  <div class="section" id="bossEditedSection" style="display:none">
+    <div class="sec-head">
+      <div class="section-title">✏️ 수정 확인 대기 <span id="bossEditedBadge" style="background:#f5a623;color:#1a0a00;font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:6px">0</span></div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Staff가 수정된 시간을 확인할 때까지 정산에 포함되지 않아요</p>
+    <div id="bossEditedList"></div>
   </div>
 
   <!-- 이번 주 정산 -->
@@ -458,6 +471,32 @@ textarea.field-box{resize:vertical;min-height:80px}
     <div class="modal-btns">
       <button class="btn-secondary" onclick="pendingGoView=false;closeModal('pwModal');goStaff()">취소</button>
       <button class="btn-primary" onclick="checkPw()">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- Boss 근무 수정 -->
+<div class="overlay hidden" id="editEntryModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>✏️ 근무 수정</h2>
+    <p id="editEntryLabel" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:16px"></p>
+    <div class="modal-field">
+      <label>출근 시간</label>
+      <input type="time" id="editStartTime" class="field-box">
+    </div>
+    <div class="modal-field">
+      <label>퇴근 시간</label>
+      <input type="time" id="editEndTime" class="field-box">
+    </div>
+    <div id="editHoursPreview" style="text-align:center;font-size:18px;font-weight:800;color:var(--accent);margin:10px 0"></div>
+    <div class="modal-field">
+      <label>수정 사유 (선택)</label>
+      <input type="text" id="editReasonInput" class="field-box" placeholder="예: 실수로 1시간 더 입력">
+    </div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal('editEntryModal')">취소</button>
+      <button class="btn-primary" onclick="saveEditEntry()">저장</button>
     </div>
   </div>
 </div>
@@ -661,16 +700,25 @@ function renderRecords(list) {
   else{
     el.innerHTML=list.map(r=>{
       const h=calcH(r.start_time||'17:00',r.end_time||'03:00');
-      totalH+=h;
-      const d=new Date(r.date+'T00:00:00');
-      const statusMap = {pending:'대기 중', approved:'승인', rejected:'거절'};
-      const statusClass = {pending:'status-pending', approved:'status-approved', rejected:'status-rejected'};
       const st = r.status || 'approved';
-      return `<div class="record-item">
-        <div><div class="record-date">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})</div>
+      // boss_edited는 합계에서 제외
+      if(st !== 'boss_edited') totalH += h;
+      const d=new Date(r.date+'T00:00:00');
+      const statusMap = {pending:'대기 중', approved:'승인', rejected:'거절', boss_edited:'확인 필요'};
+      const statusClass = {pending:'status-pending', approved:'status-approved', rejected:'status-rejected', boss_edited:'status-pending'};
+      const hasBossEdit = (r.memo||'').includes('[Boss수정');
+      const editLines = hasBossEdit ? (r.memo||'').split('\n').filter(l=>l.startsWith('[Boss수정')).map(l=>`<div style="font-size:10px;color:#f5a623;margin-top:2px">${l}</div>`).join('') : '';
+      const confLine = (r.memo||'').split('\n').filter(l=>l.startsWith('[Staff확인')).map(l=>`<div style="font-size:10px;color:#4ae08a;margin-top:2px">${l}</div>`).join('');
+      const confirmBtn = st==='boss_edited'
+        ? `<button onclick="confirmBossEdit('${r.id}')" style="margin-top:8px;width:100%;padding:7px;background:#0a2a18;color:#4ae08a;border:1px solid #1a5a38;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✅ 확인했어요</button>`
+        : '';
+      return `<div class="record-item" style="flex-wrap:wrap">
+        <div style="flex:1"><div class="record-date">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})</div>
         <div class="record-time">${r.start_time} ~ ${r.end_time}</div>
-        <span class="status-badge ${statusClass[st]}">${statusMap[st]}</span></div>
-        <div class="record-h">${Number.isInteger(h)?h:h.toFixed(1)}시간</div></div>`;
+        <span class="status-badge ${statusClass[st]}">${statusMap[st]}</span>
+        ${hasBossEdit&&st!=='boss_edited'?'<span class="status-badge" style="background:#2a1a00;color:#f5a623;border:1px solid #5a3a00;margin-left:4px">Boss수정됨</span>':''}
+        ${editLines}${confLine}${confirmBtn}</div>
+        <div class="record-h"${st==='boss_edited'?' style="color:var(--muted)"':''}>${Number.isInteger(h)?h:h.toFixed(1)}시간</div></div>`;
     }).join('');
   }
   document.getElementById('totalHours').textContent=Number.isInteger(totalH)?totalH:totalH.toFixed(1);
@@ -797,7 +845,34 @@ async function loadBossDash() {
     pendingSection.style.display='none';
   }
 
-  // 승인된 것만 정산 (status=approved 또는 null=기존 데이터)
+  // 수정 확인 대기 처리 (boss_edited)
+  const bossEdited = (allSubs||[]).filter(s=>s.status==='boss_edited');
+  const bossEditedSection = document.getElementById('bossEditedSection');
+  document.getElementById('bossEditedBadge').textContent = bossEdited.length;
+  if(bossEdited.length > 0) {
+    bossEditedSection.style.display='';
+    document.getElementById('bossEditedList').innerHTML = bossEdited.map(s=>{
+      const h=calcH(s.start_time||'17:00',s.end_time||'03:00');
+      const hVal=Number.isInteger(h)?h:h.toFixed(1);
+      const d=new Date(s.date+'T00:00:00');
+      const editLines=(s.memo||'').split('\n').filter(l=>l.startsWith('[Boss수정'))
+        .map(l=>`<div style="font-size:11px;color:#f5a623;margin-top:2px">${l}</div>`).join('');
+      return `<div class="pending-item" style="flex-direction:column;align-items:flex-start;gap:6px">
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start">
+          <div>
+            <div class="pending-name">${s.staff_name}</div>
+            <div class="pending-detail">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]}) · ${s.start_time}~${s.end_time} · ${hVal}시간</div>
+            ${editLines}
+          </div>
+          <span style="font-size:11px;color:#f5a623;white-space:nowrap;margin-left:8px">⏳ Staff 미확인</span>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    bossEditedSection.style.display='none';
+  }
+
+  // 승인된 것만 정산 (status=approved 또는 null=기존 데이터, boss_edited 제외)
   const subs = (allSubs||[]).filter(s=>!s.status||s.status==='approved');
   if(error||!subs?.length){
     document.getElementById('bsAmount').textContent='₩0';
@@ -815,7 +890,7 @@ async function loadBossDash() {
     if(!byName[s.staff_name]) byName[s.staff_name]={h:0, entries:[]};
     const h = calcH(s.start_time||'17:00', s.end_time||'03:00');
     byName[s.staff_name].h += h;
-    byName[s.staff_name].entries.push({id:s.id, date:s.date, start:s.start_time, end:s.end_time, h});
+    byName[s.staff_name].entries.push({id:s.id, date:s.date, start:s.start_time, end:s.end_time, h, memo:s.memo});
   });
 
   const wage = cfg.wage||0;
@@ -838,7 +913,14 @@ async function loadBossDash() {
     const entriesHtml = byName[n].entries.map(e=>{
       const d=new Date(e.date+'T00:00:00');
       const hVal=Number.isInteger(e.h)?e.h:e.h.toFixed(1);
-      return `<div class="pay-h">${d.getMonth()+1}/${d.getDate()} ${e.start}~${e.end} (${hVal}시간)</div>`;
+      const editLines = (e.memo||'').split('\n').filter(l=>l.startsWith('[Boss수정'))
+        .map(l=>`<div style="font-size:10px;color:#f5a623;margin-top:2px;padding-left:2px">${l}</div>`).join('');
+      return `<div class="pay-h" style="margin-bottom:${editLines?'4px':'2px'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+          <span>${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]}) ${e.start}~${e.end} · ${hVal}시간</span>
+          <button class="edit-entry-btn" onclick="openEditModal('${e.id}','${e.date}','${e.start}','${e.end}')">✏️</button>
+        </div>${editLines}
+      </div>`;
     }).join('');
     return `<div class="pay-item">
       <div><div class="pay-name">${n}</div>${entriesHtml}<div class="pay-sub" style="margin-top:4px">합계 ${Number.isInteger(h)?h:h.toFixed(1)}시간</div></div>
@@ -1231,7 +1313,64 @@ async function resetMonth() {
   loadBossDash();
 }
 
+// ── STAFF 수정 확인 ───────────────────────────────
+async function confirmBossEdit(id) {
+  const now = new Date();
+  const confirmLog = `[Staff확인 ${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}]`;
+  const {data:rec} = await sb.from('submissions').select('memo').eq('id',id).single();
+  const newMemo = [rec.memo, confirmLog].filter(Boolean).join('\n');
+  await sb.from('submissions').update({status:'approved', memo:newMemo}).eq('id',id);
+  loadMyRecords();
+}
+
 function closeModal(id){document.getElementById(id).classList.add('hidden');}
+
+// ── BOSS 근무 수정 ────────────────────────────────
+let editEntryId = null;
+
+function openEditModal(id, date, start, end) {
+  editEntryId = id;
+  const d = new Date(date + 'T00:00:00');
+  document.getElementById('editEntryLabel').textContent =
+    `${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})`;
+  document.getElementById('editStartTime').value = start;
+  document.getElementById('editEndTime').value = end;
+  updateEditHoursPreview();
+  document.getElementById('editReasonInput').value = '';
+  document.getElementById('editEntryModal').classList.remove('hidden');
+  document.getElementById('editStartTime').addEventListener('change', updateEditHoursPreview);
+  document.getElementById('editEndTime').addEventListener('change', updateEditHoursPreview);
+}
+
+function updateEditHoursPreview() {
+  const s = document.getElementById('editStartTime').value;
+  const e = document.getElementById('editEndTime').value;
+  if(!s || !e) return;
+  const h = calcH(s, e);
+  const hVal = Number.isInteger(h) ? h : h.toFixed(1);
+  const pay = cfg.wage ? ' · ₩' + Math.round(h * cfg.wage * 0.967).toLocaleString() : '';
+  document.getElementById('editHoursPreview').textContent = `${hVal}시간${pay}`;
+}
+
+async function saveEditEntry() {
+  const newStart = document.getElementById('editStartTime').value;
+  const newEnd = document.getElementById('editEndTime').value;
+  if(!newStart || !newEnd || !editEntryId) return;
+  const btn = document.querySelector('#editEntryModal .btn-primary');
+  btn.disabled = true; btn.textContent = '저장 중...';
+
+  // 기존 데이터 조회 → 원래 시간 기록
+  const {data:orig} = await sb.from('submissions').select('start_time,end_time,memo').eq('id',editEntryId).single();
+  const now = new Date();
+  const reason = document.getElementById('editReasonInput').value.trim();
+  const editLog = `[Boss수정 ${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}: ${orig.start_time}~${orig.end_time}→${newStart}~${newEnd}${reason?' · '+reason:''}]`;
+  const newMemo = [orig.memo, editLog].filter(Boolean).join('\n');
+
+  await sb.from('submissions').update({start_time:newStart, end_time:newEnd, memo:newMemo, status:'boss_edited'}).eq('id',editEntryId);
+  btn.disabled = false; btn.textContent = '저장';
+  closeModal('editEntryModal');
+  loadBossDash();
+}
 </script>
 </body>
 </html>
