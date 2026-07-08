@@ -1144,8 +1144,11 @@ async function confirmStaffDel() {
   }
   const name = staffRoster[staffDelIndex];
   closeModal('staffDelModal');
+  // 직원 삭제 + 해당 직원의 모든 제출 기록도 삭제
   await sb.from('staff_roster').delete().eq('name', name);
+  await sb.from('submissions').delete().eq('staff_name', name);
   loadStaffRoster();
+  loadBossDash();
 }
 
 // ── NAV ───────────────────────────────────────────
