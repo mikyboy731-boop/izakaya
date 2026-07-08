@@ -716,11 +716,26 @@ async function actualSubmit() {
 
   // 중복 체크
   const {data:existing} = await sb.from('submissions')
-    .select('id').eq('staff_name',name).eq('date',date);
-  if(existing && existing.length > 0){
-    btn.disabled=false; btn.textContent='Boss에게 전송';
-    showMsg('err','⚠️ 이미 제출된 날짜예요. 수정이 필요하면 Boss에게 문의하세요.');
-    return;
+    .select('id,status').eq('staff_name',name).eq('date',date);
+  const existingRecord = existing && existing[0];
+  if(existingRecord) {
+    if(existingRecord.status === 'rejected') {
+      // 거절된 기록이면 재전송(업데이트)
+      const {error} = await sb.from('submissions').update({
+        start_time:start, end_time:end, memo:memo||null, status:'pending', week_key:wk
+      }).eq('id', existingRecord.id);
+      btn.disabled=false; btn.textContent='Boss에게 전송';
+      if(error){showMsg('err','전송 실패: '+error.message);return;}
+      showMsg('ok','✅ 재전송 완료! Boss 승인을 기다려주세요.');
+      document.getElementById('staffMemo').value='';
+      document.getElementById('dateSelect').value='';
+      loadMyRecords();
+      return;
+    } else {
+      btn.disabled=false; btn.textContent='Boss에게 전송';
+      showMsg('err','⚠️ 이미 제출된 날짜예요. 수정이 필요하면 Boss에게 문의하세요.');
+      return;
+    }
   }
 
   const {error}=await sb.from('submissions').insert({
