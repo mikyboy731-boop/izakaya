@@ -614,9 +614,9 @@ function buildDateOptions() {
   const sel = document.getElementById('dateSelect');
   sel.innerHTML = '<option value="">날짜 선택</option>';
   const today = new Date();
-  // 새벽 6시 이전이면 어제부터 시작 (야간 근무 날짜 밀림 방지)
+  // 항상 3일 전부터 선택 가능 (야간 근무 후 다음날 낮에 제출해도 전날 날짜 선택 가능)
   const start = new Date(today);
-  if (today.getHours() < 6) start.setDate(start.getDate() - 1);
+  start.setDate(start.getDate() - 3);
   const lastOfNextMonth = new Date(today.getFullYear(), today.getMonth()+2, 0);
   const d = new Date(start);
   while(d <= lastOfNextMonth) {
