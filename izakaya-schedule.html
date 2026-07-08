@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>작살 Staff</title>
 <!-- PWA -->
 <link rel="manifest" href="./manifest.json">
@@ -475,6 +478,23 @@ textarea.field-box{resize:vertical;min-height:80px}
   </div>
 </div>
 
+<!-- 수정 확인 대기 삭제 -->
+<div class="overlay hidden" id="bossEditDelModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>🗑️ 기록 삭제</h2>
+    <p>삭제하면 복구가 불가능합니다.<br>비밀번호를 입력하세요.</p>
+    <div class="modal-field">
+      <input type="password" id="bossEditDelPw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')confirmBossEditDel()">
+    </div>
+    <div class="err-text" id="bossEditDelErr">비밀번호가 틀렸습니다</div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal('bossEditDelModal')">취소</button>
+      <button class="btn-primary" style="background:#c0392b" onclick="confirmBossEditDel()">삭제</button>
+    </div>
+  </div>
+</div>
+
 <!-- Boss 근무 수정 -->
 <div class="overlay hidden" id="editEntryModal">
   <div class="modal">
@@ -525,6 +545,13 @@ textarea.field-box{resize:vertical;min-height:80px}
 </div>
 
 <script>
+// ── 자동 버전 체크 (업데이트 시 강제 새로고침) ──────
+const APP_VERSION = '20260709-v3';
+if(sessionStorage.getItem('app_ver') !== APP_VERSION) {
+  sessionStorage.setItem('app_ver', APP_VERSION);
+  location.reload(true);
+}
+
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 const SB_URL = 'https://brhcnejnqflfcpgetukb.supabase.co';
 const SB_KEY = 'sb_publishable_hoWEngA_eXKK-5k2XySXTw_cshw4chQ';
@@ -864,7 +891,10 @@ async function loadBossDash() {
             <div class="pending-detail">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]}) · ${s.start_time}~${s.end_time} · ${hVal}시간</div>
             ${editLines}
           </div>
-          <span style="font-size:11px;color:#f5a623;white-space:nowrap;margin-left:8px">⏳ Staff 미확인</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:8px;flex-shrink:0">
+            <span style="font-size:11px;color:#f5a623;white-space:nowrap">⏳ Staff 미확인</span>
+            <button onclick="openBossEditDel('${s.id}')" style="background:none;border:none;color:#4a6a8a;font-size:18px;cursor:pointer;line-height:1;padding:0 2px" title="삭제">×</button>
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -1310,6 +1340,26 @@ async function resetMonth() {
   btn.disabled = false; btn.textContent = '삭제';
   closeModal('resetModal');
   if(error){ alert('삭제 실패: ' + error.message); return; }
+  loadBossDash();
+}
+
+// ── 수정 확인 대기 삭제 ──────────────────────────
+let bossEditDelId = null;
+function openBossEditDel(id) {
+  bossEditDelId = id;
+  document.getElementById('bossEditDelPw').value = '';
+  document.getElementById('bossEditDelErr').style.display = 'none';
+  document.getElementById('bossEditDelModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('bossEditDelPw').focus(), 200);
+}
+async function confirmBossEditDel() {
+  if(document.getElementById('bossEditDelPw').value !== (cfg.pw||'0000')) {
+    document.getElementById('bossEditDelErr').style.display = 'block';
+    document.getElementById('bossEditDelPw').value = '';
+    return;
+  }
+  await sb.from('submissions').delete().eq('id', bossEditDelId);
+  closeModal('bossEditDelModal');
   loadBossDash();
 }
 
