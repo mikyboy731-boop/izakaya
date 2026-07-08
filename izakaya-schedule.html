@@ -159,6 +159,22 @@ textarea.field-box{resize:vertical;min-height:80px}
 .btn-primary{flex:1;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
 .btn-secondary{padding:14px 20px;background:none;color:var(--muted);border:1.5px solid var(--border);border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit}
 .err-text{font-size:12px;color:#f07070;margin-top:6px;display:none}
+
+/* ── STATUS BADGE ── */
+.status-badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:3px}
+.status-pending{background:#2a2200;color:#f5c842;border:1px solid #5a4800}
+.status-approved{background:#0a2a18;color:#4ae08a;border:1px solid #1a5a38}
+.status-rejected{background:#2a0a0a;color:#f07070;border:1px solid #5a1a1a}
+
+/* ── PENDING ITEMS ── */
+.pending-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.pending-item:last-child{border-bottom:none}
+.pending-info{flex:1}
+.pending-name{font-size:14px;font-weight:700;color:var(--text)}
+.pending-detail{font-size:12px;color:var(--muted);margin-top:2px}
+.pending-btns{display:flex;gap:6px;flex-shrink:0}
+.btn-approve{padding:6px 12px;background:#0a2a18;color:#4ae08a;border:1px solid #1a5a38;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-reject{padding:6px 12px;background:#2a0a0a;color:#f07070;border:1px solid #5a1a1a;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
@@ -260,6 +276,14 @@ textarea.field-box{resize:vertical;min-height:80px}
     </div>
   </div>
 
+  <!-- 승인 대기 -->
+  <div class="section" id="pendingSection" style="display:none">
+    <div class="sec-head">
+      <div class="section-title">⏳ 승인 대기 <span id="pendingBadge" style="background:#f5c842;color:#1a1000;font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:6px">0</span></div>
+    </div>
+    <div id="pendingList"></div>
+  </div>
+
   <!-- 이번 주 정산 -->
   <div class="section">
     <div class="sec-head">
@@ -319,6 +343,37 @@ textarea.field-box{resize:vertical;min-height:80px}
 </div><!-- /viewView -->
 
 <!-- ════ MODALS ════ -->
+
+<!-- 전송 확인 모달 -->
+<div class="overlay hidden" id="confirmModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>📋 전송 전 확인</h2>
+    <div id="confirmContent" style="background:#07111f;border-radius:12px;padding:16px;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="color:var(--muted);font-size:13px">날짜</span>
+        <span style="font-weight:700;color:var(--text);font-size:13px" id="cfmDate">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="color:var(--muted);font-size:13px">시간</span>
+        <span style="font-weight:700;color:var(--text);font-size:13px" id="cfmTime">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="color:var(--muted);font-size:13px">근무시간</span>
+        <span style="font-weight:800;color:var(--accent);font-size:15px" id="cfmHours">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px">
+        <span style="color:var(--muted);font-size:13px">예상 세후</span>
+        <span style="font-weight:800;color:#4ae08a;font-size:15px" id="cfmPay">—</span>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">맞으면 전송, 틀리면 수정해주세요</p>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal('confirmModal')">수정하기</button>
+      <button class="btn-primary" onclick="actualSubmit()">전송하기</button>
+    </div>
+  </div>
+</div>
 
 <!-- 비밀번호 설정 (첫 접속) -->
 <div class="overlay hidden" id="setPwModal">
@@ -612,9 +667,13 @@ function renderRecords(list) {
       const h=calcH(r.start_time||'17:00',r.end_time||'03:00');
       totalH+=h;
       const d=new Date(r.date+'T00:00:00');
+      const statusMap = {pending:'대기 중', approved:'승인', rejected:'거절'};
+      const statusClass = {pending:'status-pending', approved:'status-approved', rejected:'status-rejected'};
+      const st = r.status || 'approved';
       return `<div class="record-item">
         <div><div class="record-date">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})</div>
-        <div class="record-time">${r.start_time} ~ ${r.end_time}</div></div>
+        <div class="record-time">${r.start_time} ~ ${r.end_time}</div>
+        <span class="status-badge ${statusClass[st]}">${statusMap[st]}</span></div>
         <div class="record-h">${Number.isInteger(h)?h:h.toFixed(1)}시간</div></div>`;
     }).join('');
   }
@@ -630,15 +689,36 @@ async function submitSchedule() {
   const date=document.getElementById('dateSelect').value;
   const start=document.getElementById('startTime').value;
   const end=document.getElementById('endTime').value;
-  const memo=document.getElementById('staffMemo').value.trim();
   if(!name){showMsg('err','이름을 입력해주세요');return;}
   if(!date){showMsg('err','날짜를 선택해주세요');return;}
   if(!sb){showMsg('err','Supabase 설정이 필요합니다');return;}
+
+  // 확인 팝업 표시
+  const h = calcH(start, end);
+  const hVal = Number.isInteger(h) ? h : h.toFixed(1);
+  const d = new Date(date+'T00:00:00');
+  const gross = cfg.wage ? h * cfg.wage : 0;
+  const net = Math.round(gross * 0.967);
+  document.getElementById('cfmDate').textContent = `${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]})`;
+  document.getElementById('cfmTime').textContent = `${start} ~ ${end}`;
+  document.getElementById('cfmHours').textContent = `${hVal}시간`;
+  document.getElementById('cfmPay').textContent = cfg.wage ? '₩'+net.toLocaleString() : '시급 미설정';
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+async function actualSubmit() {
+  const name=document.getElementById('staffName').value.trim();
+  const date=document.getElementById('dateSelect').value;
+  const start=document.getElementById('startTime').value;
+  const end=document.getElementById('endTime').value;
+  const memo=document.getElementById('staffMemo').value.trim();
+  closeModal('confirmModal');
+
   const btn=document.getElementById('submitBtn');
-  btn.disabled=true; btn.textContent='확인 중...';
+  btn.disabled=true; btn.textContent='전송 중...';
   const wk=dateToMonthKey(date);
 
-  // 중복 체크 (날짜+이름만으로, week_key 포맷 무관)
+  // 중복 체크
   const {data:existing} = await sb.from('submissions')
     .select('id').eq('staff_name',name).eq('date',date);
   if(existing && existing.length > 0){
@@ -649,16 +729,15 @@ async function submitSchedule() {
 
   const {error}=await sb.from('submissions').insert({
     staff_name:name,week_key:wk,date,start_time:start,end_time:end,
-    available:true,can_extend:false,extend_hours:0,early_leave_time:null,memo:memo||null
+    available:true,can_extend:false,extend_hours:0,early_leave_time:null,
+    memo:memo||null,status:'pending'
   });
   btn.disabled=false; btn.textContent='Boss에게 전송';
   if(error){showMsg('err','전송 실패: '+error.message);return;}
-  // 이름 이 기기에 고정
   lockedName = name;
   localStorage.setItem('my_staff_name', name);
   renderStaffSelect();
-
-  showMsg('ok','✅ 전송 완료!');
+  showMsg('ok','✅ 전송 완료! Boss 승인을 기다려주세요.');
   document.getElementById('staffMemo').value='';
   document.getElementById('dateSelect').value='';
   loadMyRecords();
@@ -678,15 +757,44 @@ async function loadBossDash() {
     (ownerMonthOffset===0?'이번 달':'다음 달') + ' 예상 인건비 · ' + monthLabel(ownerMonthOffset);
 
   const {first, last} = monthRange(ownerMonthOffset);
-  const {data:subs,error} = await sb.from('submissions').select('*')
+  const {data:allSubs,error} = await sb.from('submissions').select('*')
     .gte('date', first).lte('date', last).order('date');
+
+  // 승인 대기 처리
+  const pending = (allSubs||[]).filter(s=>s.status==='pending');
+  const pendingSection = document.getElementById('pendingSection');
+  const pendingList = document.getElementById('pendingList');
+  document.getElementById('pendingBadge').textContent = pending.length;
+  if(pending.length > 0) {
+    pendingSection.style.display='';
+    pendingList.innerHTML = pending.map(s=>{
+      const h=calcH(s.start_time||'17:00',s.end_time||'03:00');
+      const hVal=Number.isInteger(h)?h:h.toFixed(1);
+      const d=new Date(s.date+'T00:00:00');
+      return `<div class="pending-item">
+        <div class="pending-info">
+          <div class="pending-name">${s.staff_name}</div>
+          <div class="pending-detail">${d.getMonth()+1}/${d.getDate()} (${DAY_NAMES[d.getDay()]}) · ${s.start_time}~${s.end_time} · ${hVal}시간${s.memo?` · ${s.memo}`:''}</div>
+        </div>
+        <div class="pending-btns">
+          <button class="btn-approve" onclick="approveSubmission('${s.id}')">승인</button>
+          <button class="btn-reject" onclick="rejectSubmission('${s.id}')">거절</button>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    pendingSection.style.display='none';
+  }
+
+  // 승인된 것만 정산 (status=approved 또는 null=기존 데이터)
+  const subs = (allSubs||[]).filter(s=>!s.status||s.status==='approved');
   if(error||!subs?.length){
     document.getElementById('bsAmount').textContent='₩0';
     document.getElementById('bsAmountNet').textContent='₩0';
     document.getElementById('bsTotalH').textContent='0';
     document.getElementById('bsStaffCount').textContent='0';
     document.getElementById('payrollList').innerHTML=
-      '<div class="pay-empty">아직 전송된 근무가 없어요.<br>Staff가 입력하면 여기에 모입니다.</div>';
+      '<div class="pay-empty">아직 승인된 근무가 없어요.</div>';
     return;
   }
 
@@ -1072,6 +1180,16 @@ function changeViewMonth(dir) {
 
 function changeMonth(dir) {
   ownerMonthOffset += dir;
+  loadBossDash();
+}
+
+async function approveSubmission(id) {
+  await sb.from('submissions').update({status:'approved'}).eq('id',id);
+  loadBossDash();
+}
+
+async function rejectSubmission(id) {
+  await sb.from('submissions').update({status:'rejected'}).eq('id',id);
   loadBossDash();
 }
 
